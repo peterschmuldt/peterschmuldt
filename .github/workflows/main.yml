@@ -1,0 +1,154 @@
+---
+title: "US-Based Entry-Level Data Analyst Position Recommendation and Important Info to Know"
+author: "Peter Schmuldt"
+date: "2023-06-29"
+output:
+  html_document: default
+---
+# **ASK phase of the study**
+Rather than representing a company, the purpose of the case study is to explore salaries for entry-level Data Analysts based in the United States. Therefore, the pertinent stakeholders are not just prospective junior data scientists, but also business recruiters. The data obtained in the case study was pulled from one of [RANDOMARNAB's Kaggle dataset](https://www.kaggle.com/datasets/arnabchaki/data-science-salaries-2023) (cited at the end of the study) which was a list of worldwide available data science-related positions as of March 2023. The dataset contained some information that wasn't needed in the study, such as jobs located in countries outside the United States, or positions that required more experience.
+  The key insights for this project are "What keywords should I use when job-hunting?" and "What kind of salary can I expect from (relatively) market-matching companies?"
+  
+# **PREPARE phase of the study**
+As previously mentioned, the dataset used came from a public dataset on Kaggle(cited below). The data is clearly current since it was made in March of 2023, just 3 months prior to this study. Admittedly, the data is not as current as the creator would prefer, however it is under their impression that it is current enough to give a gist of the current job market and market salary. The data was filtered to only contain information pertinent to the study, US-based Entry-Level and Virtual positions. The reason for each specific filter was to keep the data country specific for the stakeholders, but general enough for it to be accessible country-wide. The process of cleaning and transforming data is exemplified below in the R coding chunks included.
+
+
+## **Setting up my environment**
+Notes: I loaded the necessary packages, "flexdashboard", "tinytex", "rmarkdown", "tidyverse", "ggplot2", "tidyr", "readr", "dplyr", "skimr","janitor"', "here", and "formatR"
+```{r loading packages, message = FALSE}
+library("flexdashboard")
+library("tinytex")
+library("rmarkdown")
+library("tidyverse")
+library("ggplot2")
+library("tidyr")
+library("readr")
+library("dplyr")
+library("skimr")
+library("janitor")
+library("here")
+library("formatR")
+library("readxl")
+library("packrat")
+library("rsconnect")
+```
+#### *Upload the dataframe*
+```{r upload the dataframe, message = FALSE}
+data_science_salaries <- read_csv(here("ds_salaries.csv"))
+```
+
+# **ANALYZE and SHARE phases of the study**
+
+## **Data Cleansing Process**
+#### *Checking for data that is not characters, numbers, and underscores*
+Next, I checked for any values in the columns that are not characters, numbers, or underscores.
+```{r check for invalid data, results = FALSE}
+clean_names(data_science_salaries)
+```
+
+#### *Checking for missing data*
+After that, I ran a short blurb of code to look over the dataset at a glance, and look for missing data.
+```{r check for missing data, results = FALSE}
+skim_without_charts(data_science_salaries)
+```
+
+#### *Checking for irregular data*
+I continued the data cleansing process by checking character length in key columns.
+```{r check for irregular data and make sure string length is consistent}
+data_science_salaries$work_year_leng = nchar(as.character(data_science_salaries$work_year))
+data_science_salaries$salary_currency_leng = nchar(as.character(data_science_salaries$salary_currency))
+data_science_salaries$employee_residence_leng = nchar(as.character(data_science_salaries$employee_residence))
+data_science_salaries$company_location_leng = nchar(as.character(data_science_salaries$company_location))
+```
+
+#### *Validating data returned from the previous table*
+Since the code I ran matched the table returned in the skim_without_charts command, I knew I could proceed to the analysis process. Since I live in the United States, the only jobs I needed to look at from the dataset which were US-based.
+
+#### *Narrowing search to US-based jobs*
+```{r create a subset table that only includes US-based jobs}
+us_ds_salaries <- subset(data_science_salaries, company_location == "US")
+```
+
+There were a lot of different job titles listed, so I ran some code to determine exactly how many different job title descriptions were in the list.
+
+#### *Finding job title spreads*
+```{r find how many different job titles there are}
+n_distinct(us_ds_salaries$job_title)
+```
+
+#### *Determining the most numerous job titles*
+That line of code revealed that there were 70 different job titles in the US. I decided to sort the data further and look at only the jobs that interested me, and were also most numerous. Using the most common job titles will help me narrow down my search a bit so that I will know what key words to use when looking for a job.
+```{r find the most numerous job titles, message = FALSE}
+us_ds_salaries %>% 
+  count(job_title,sort = TRUE)
+```
+
+## Common Job Titles
+It appears that Data Engineer,Data Scientist, Data Analyst, and Machine Learning Engineer are the  most common titles for job postings. After looking at the returned information, I noticed that the biggest hits for job titles were Data Engineer, Data Scientist, Data Analyst, and Machine Learning Engineer. I decided to hone in on that and continue my analysis with that information in mind. I focused in on those jobs by creating a new dataframe that included only those 4 job titles.
+```{r make a new table of the US jobs that only include the most frequent job titles}
+most_common_us_job_titles <-
+  data_science_salaries[data_science_salaries$company_location == 'US' &
+                data_science_salaries$job_title %in% c('Data Engineer',
+                                             'Data Scientist',
+                                             'Data Analyst',
+                                             'Machine Learning Engineer'), ]
+```
+
+From there, I created a barplot to visualize the spread of each job title across the new dataframe I had created.
+```{r look at market spread for most common job titles by creating a barplot, echo = FALSE}
+print(ggplot(most_common_us_job_titles, aes(job_title, fill = "match"))+
+  geom_bar(show.legend = FALSE)+ theme_minimal()+
+  geom_text(aes(label = after_stat(count)), stat = "count", vjust = -1)+
+  ggtitle("Aggregate Market Spread of Data Science Jobs March 2023")+
+  xlab("Job Title") + ylab("Count")+ 
+  theme(
+    plot.title = element_text(color = "black",  size = 14, face = "bold.italic"),
+    axis.title.x = element_text(color = "black", size = 12, face = "bold"),
+    axis.title.y = element_text(color = "black", size = 12, face = "bold")
+  ))
+```
+
+## **Refining the search**
+Since I am using this project as a first look at finding my first job in data analytics, I needed to further refine my search by creating yet another dataframe which included only entry-level positions.
+```{r create a dataframe to see those jobs which have a categorical label of entry level, "EN"}
+entry_level_jobs <- subset(most_common_us_job_titles, experience_level == "EN")
+```
+
+Additionally, since the United States is a large area to find a job and the state/sity is not specified, it is best to find a Work-From-Home position, so I created another dataframe which included only virtual positions.
+```{r since the job descriptors do not specify states, it is best for this case to look solely for remote jobs}
+remote_entry_level <- subset(entry_level_jobs, remote_ratio == "100")
+```
+
+After that, I created a summative barplot showing the distribution of the most common job titles that are US-based, virtual, and entry-level.
+```{r create a barplot to show the possible jobs left for an entry-level analyst as of March 2023, echo=FALSE}
+print(ggplot(remote_entry_level, aes(job_title, fill = "match"))+
+  geom_bar(show.legend = FALSE)+ theme_minimal()+
+  geom_text(aes(label = after_stat(count)), stat = "count", vjust = -1)+
+  ggtitle("Entry-Level Virtual Data Science Job Market Spread March 2023")+
+  xlab("Job Title") + ylab("Count")+
+  theme(
+    plot.title = element_text(color = "black", size = 14, face = "bold.italic"),
+    axis.title.x = element_text(color = "black", size = 12, face = "bold"),
+    axis.title.y = element_text(color = "black", size = 12, face = "bold")
+  ))
+```
+
+Finally, it is important in job interviews to know how much an entry-level data analyst position should make, so I calculated the average entry-level position salary.
+```{r finally, look at the average salary I can expect to make in my first year(s) of work}
+mean_salary <-
+  mean(remote_entry_level$salary_in_usd) # the mean salary is $84,105.83
+median_salary <-
+  median(remote_entry_level$salary_in_usd) #the median salary is 80,000
+salary_standard_deviation <-
+  sd(remote_entry_level$salary_in_usd, na.rm = TRUE) # the standard deviation is $32,891.17
+```
+
+Since the mean and median salary levels are relatively close to each other, within one standard deviation, it is acceptable to expect an entry-level salary to be somewhere around 80,000USD.
+
+# **ACT phase of the study**
+Based on the study, job-hunting, a smart move is searching for job titles of "Data Analyst", "Data Engineer", "Data Scientist", and "Machine Learning Engineer" since those terms are most populous in job descriptions. Once a person has secured an interview, in the steps going forward, it is wise for them to know that the market salary as of March 2023 is 80,000USD. These pieces of information will not only help candidates find jobs, but also prevent them from being sold short in salary discussions.
+
+RANDOMARNAB, (2023). Data Science Salaries 2023
+Kaggle. https://www.kaggle.com/datasets/arnabchaki/data-science-salaries-2023/code))
+
+<br><br><br><br>
