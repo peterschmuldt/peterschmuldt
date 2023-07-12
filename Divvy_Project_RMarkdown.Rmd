@@ -1,0 +1,235 @@
+---
+title: "How Cyclistic Can Increase Membership"
+author: "Peter Schmuldt"
+date: "July 2023"
+output: html_document
+---
+
+# **Business Task**
+Analyze ridesharing bicycle data to create ideas to improve membership in Cyclistic's program. The task involves compiling collected data and identifying how riders that don't have a membership compare to riders who hold a membership. Finding those differences can help Cyclistic make data-driven decisions on how they can increase membership in their program.
+
+# **Data and Tools Used**
+Description of Data Used: [Data](https://divvy-tripdata.s3.amazonaws.com/index.html "Data Used") from Chicago's Divvy bikesharing company was downloaded and used as an example for this project. While there is data from multiple years, the only data used was from the 12 most recent months as of the start of the study. Additionally, the data was uploaded to RStudio which was used for manipulation and data visualization.
+
+# *Processing Data*
+## **Setting up my environment**
+#### *loading necessary packages*
+```{r loading packages, message = FALSE}
+library("flexdashboard")
+library("tinytex")
+library("rmarkdown")
+library("tidyverse")
+library("skimr")
+library("janitor")
+library("here")
+library("formatR")
+library("data.table")
+library("ggplot2")
+```
+
+#### *Upload the dataframes*
+```{r upload the dataframes, message = FALSE}
+may_data <- read_csv(here("202305-divvy-tripdata.csv"))
+april_data <- read_csv(here("202304-divvy-tripdata.csv"))
+march_data <- read_csv(here("202303-divvy-tripdata.csv"))
+february_data <- read_csv(here("202302-divvy-tripdata.csv"))
+january_data <- read_csv(here("202301-divvy-tripdata.csv"))
+december_data <- read_csv(here("202212-divvy-tripdata.csv"))
+november_data <- read_csv(here("202211-divvy-tripdata.csv"))
+october_data <- read_csv(here("202210-divvy-tripdata.csv"))
+september_data <- read_csv(here("202209-divvy-publictripdata.csv"))
+august_data <- read_csv(here("202208-divvy-tripdata.csv"))
+july_data <- read_csv(here("202207-divvy-tripdata.csv"))
+june_data <- read_csv(here("202206-divvy-tripdata.csv"))
+```
+
+#### *Synthesize the dataframes*
+```{r synthesize the dataframes, message = FALSE}
+total_rides <-
+  rbindlist(
+    list(
+      may_data,
+      april_data,
+      march_data,
+      february_data,
+      january_data,
+      december_data,
+      november_data,
+      october_data,
+      september_data,
+      august_data,
+      july_data,
+      june_data
+    )
+  )
+```
+
+Then, check for invalid data, missing data, and irregular data
+```{r check for invalid data, results = FALSE}
+clean_names(total_rides)
+skim_without_charts(total_rides)
+```
+
+Make a column that shows the duration of each ride. Note: the result is measured in seconds, but descriptors will be in minute or hour intervals.
+```{r make a column for ride duration, called ride_length}
+total_rides$ride_length <- total_rides$ended_at - total_rides$started_at
+```
+
+### *Prepare the rides that have been categorized as "casual" for analysis*
+```{r create a dataframe that includes only casual riders}
+casual_riders <- total_rides[total_rides$member_casual == "casual", ]
+casual_riders <- casual_riders[casual_riders$ride_length > 0, ]
+```
+
+Find both the average and the median ride lengths for non-member riders
+```{r find the average and median ride lengths for casual riders}
+avg_ride_length_casual <- mean(casual_riders$ride_length, na.rm = TRUE)
+avg_ride_length_casual_numeric <- as.numeric(avg_ride_length_casual)
+
+median_ride_length_casual <- median(casual_riders$ride_length, na.rm = TRUE)
+median_ride_length_casual_numerical <- as.numeric(median_ride_length_casual)
+```
+
+Then, make sure that ride_length is in a proper format for analyzing
+```{r imputing data for casual riders, message = FALSE}
+casual_riders$ride_length <- as.numeric(as.character(casual_riders$ride_length))
+non_numeric <- is.na(casual_riders$ride_length | is.infinite(casual_riders$ride_length))
+
+casual_riders$ride_length[non_numeric] <- NA
+mean_value_casual <- mean(casual_riders$ride_length, na.rm = TRUE)
+casual_riders$ride_length[is.na(casual_riders$ride_length)] <- mean_value_casual
+```
+
+Part of the context given in this study is that the bikes are used mostly for leisure and for commuting to work. Keeping that in mind, it is sensible that a time boundary of 24 hours should be used for the analysis. There are 86,400 seconds in one day, and since the ride duration column is quantified in seconds, use 86,400 instead of 24.
+```{r creating a dataframe for casual riders that holds only rides that last a day or less}
+filtered_casual_riders <- casual_riders %>% 
+  filter(ride_length >= 0 & ride_length <= 86400)
+```
+
+
+### *Prepare the rides that have been categorized as "members" for analysis*
+```{r create a dataframe that includes only members}
+member_riders <- total_rides[total_rides$member_casual == "member", ]
+member_riders <- member_riders[member_riders$ride_length > 0, ]
+```
+
+Find both the average and median ride durations for riders who hold a membership.
+```{r find the average and median ride durations for riders who hold a membership}
+avg_ride_length_member <- mean(member_riders$ride_length, na.rm = TRUE)
+avg_ride_length_member_numeric <- as.numeric(avg_ride_length_member)
+
+median_ride_length_member <- median(member_riders$ride_length, na.rm = TRUE)
+median_ride_length_member_numerical <- as.numeric(median_ride_length_member)
+```
+
+Then, make sure that the ride duration column is in the proper format for analyzing.
+```{r imputing data for members, message = FALSE}
+member_riders$ride_length <- as.numeric(as.character(member_riders$ride_length))
+non_numeric <- is.na(member_riders$ride_length | is.infinite(member_riders$ride_length))
+member_riders$ride_length[non_numeric] <- NA
+mean_value_member <- mean(member_riders$ride_length, na.rm = TRUE)
+member_riders$ride_length[is.na(member_riders$ride_length)] <- mean_value_member
+```
+
+Once again, if the bikes are used primarily for leisure and commuting, it is sensible to limit the information we look at to have a length of 24 hours or less.
+```{r creating a member table that holds only rides that last a day or less}
+filtered_member_riders <- member_riders %>% 
+  filter(ride_length >= 0 & ride_length <= 86400)
+```
+
+# **Analysis of Data Collected**
+
+In the initial calculations, the average and median ride durations were displayed. Therefore, create a table that shows that information for both non-members and members.
+```{r create a table that shows the average and median ride durations, echo = FALSE}
+mean_median_table <-
+  matrix(
+    data = c(
+      "Member Type",
+      "Mean",
+      "Median",
+      "Casual",
+      "28 minutes, 12 seconds",
+      "12 minutes, 15 seconds",
+      "Member",
+      "12 minutes, 28 seconds",
+      "8 minutes, 36 seconds"
+    ),
+    nrow = 3,
+    ncol = 3,
+    byrow = TRUE
+  )
+print(mean_median_table)
+```
+
+I created a histogram to get a better look at how non-members and members used the bikes in terms of ride duration. The first graph is the ride duration for non-members. Each column represents 10-minute intervals, i.e. the first column is the count of rides that were 10 minutes or less, the second column is the count of rides between 10 minutes(exclusive) and 20 minutes(inclusive), etc.
+```{r create a histogram that shows the ride distribution during a day for those who do not hold memberships, echo = FALSE}
+ggplot(filtered_casual_riders, aes(x=ride_length))+
+  geom_histogram(binwidth = 600, fill = "blue", color = "black")+
+  labs(x = "Ride Length", y = "Frequency")+
+  ggtitle("Histogram of Non-Member Rides 24 Hours or Less")+
+  theme_minimal()
+```
+
+The second histogram represents ride duration for riders who hold a membership. Again, each column represents 10-minute intervals.
+```{r create a histogram that shows the ride distribution during a day for those who hold memberships, echo = FALSE}
+ggplot(filtered_member_riders, aes(x = ride_length))+
+  geom_histogram(binwidth = 600, fill = "red", color = "black")+
+  labs(x = "Member Ride Length", y = "Frequency")+
+  ggtitle("Histogram of Member Rides 24 Hours or Less")+
+  theme_minimal()
+```
+
+It was clear that 24 hours was too wide a time period for both non-members and members alike. For non-members, most rides were concentrated to under 1 hour. I made a histogram to adjust for that. While the histogram's overall time period is shortened, the length represented for each column is still 10 minutes.
+```{r create a histogram that shows ride duration for all casuals whose rides are under one hour, echo = FALSE}
+short_casual_riders <- filtered_casual_riders %>% 
+  filter(ride_length >= 0 & ride_length <= 3600)
+
+ggplot(short_casual_riders, aes(x=ride_length))+
+  geom_histogram(binwidth = 600, fill = "blue", color = "black")+
+  labs(x = "Ride Length", y = "Frequency")+
+  ggtitle("Histogram of Casual Rides Less than 1 Hour")+
+  theme_minimal()
+```
+
+I also needed to reflect the time period adjustment for riders who hold a membership. It is worth noting that the histogram shows rides that are less than 4-and-a-half hours. 
+```{r create a histogram that shows ride duration for all members whose rides are under five hours, echo = FALSE}
+short_member_riders <- filtered_member_riders %>% 
+  filter(ride_length >= 0 & ride_length <= 2500)
+
+ggplot(short_member_riders, aes(x = ride_length))+
+  geom_histogram(binwidth = 600, fill = "red", color = "black")+
+  labs(x = "Member Ride Length", y = "Frequency")+
+  ggtitle("Histogram of Member Rides Less Than 4.5 Hours")+
+  theme_minimal()
+```
+
+Noticing the distribution for the ride durations will be important when discussing my recommendations for increasing membership at Cyclistic.
+
+A final part of my analysis is to find the stations most frequented by users who do not hold a membership. It is important to note that in the original dataset, some starting and ending station names were not given. This query has been adjusted to remove the blanks and only include the data which contains values that correspond to bike stations. The numbers that are returned in the table represent how many times those stations were frequented in the past year.
+```{r find the most common stations used by casuals, echo = FALSE}
+start_station_freq_table <- table(casual_riders$start_station_name)
+start_top_5 <- head(sort(start_station_freq_table, decreasing = TRUE), 5)
+print(start_top_5)
+
+end_station_freq_table <- table(casual_riders$end_station_name)
+end_top_5 <- head(sort(end_station_freq_table, decreasing = TRUE), 5)
+print(end_top_5)
+```
+
+There is a key difference between users who hold a membership and the users who do not hold a membership. The ride duration for non-members is significantly shorter than the ride durations of the people who hold memberships at Cyclistic. Since non-member users are charged on the type of pass they use, either single-ride or day-long pass, they are more likely to feel a time constraint than those who have the year-long membership.
+
+# **Recommendations for Implementation**
+Based on the insights gained from the data, it would be beneficial if Cyclistic were to run an advertisement along the lines of "first 5 rides under 20 minutes with a membership is half off", I believe membership would increase. Expanding on that, I believe that those new members will feel more free to use the bikes longer and more often.
+
+One recommendation for implementation would be to place ads around the stations that are frequented most by users who are not members. The stations that are most popular both for starting and finishing rides are as follows: Streeter Dr & Grand Ave, DuSable Lake Shore Dr & Monroe St, Michigan Ave & Oak St, Millenium Park, and DuSable Lake Shore Dr & North Blvd. If Cyclistic would like to post advertisements at more locations, it would be easy for the analyst to find more than just the 5 stations listed. It is also worth noting that while the top 5 most frequented starting stations are the same as the top 5 most frequented ending stations, that may change if the number of stations is increased from 5.
+
+Another recommendation would be to offer the same, or similar offer directly in Cyclistic's mobile app. That way, current users who do not hold a membership and do not frequent the 5 most used stations will still be notified about the special offer no matter what station they use. By using this blanket approach, Cyclistic has an even higher chance of getting non-member users to sign up for a membership.
+
+### *Citations of sources used*
+Certification Company; Coursera: Google Data Analytics Certification." (n.d.). Coursera. Retrieved July 9, 2023, from https://www.coursera.org/professional-certificates/google-data-analytics
+
+Data Retrieved; Divvy Trip Data. (n.d.). Retrieved July 9, 2023, from https://divvy-tripdata.s3.amazonaws.com/index.html
+
+Analysis tool used; RStudio Team (2020). RStudio: Integrated Development for R. RStudio, PBC, Boston, MA URL http://www.rstudio.com/
+
+<br><br><br><br>
